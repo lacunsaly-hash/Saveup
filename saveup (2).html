@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SaveUp – Control de gastos para estudiantes</title>
+<style>
+/* ===== 1. ESTILOS: colores y medidas compartidas por todas las pantallas ===== */
+:root{--ink:#1d2540;--bg:#f2f6fb;--card:#fff;--main:#1f8a70;--soft:#d9f1e9;--sun:#ffc43d;--mut:#5b6580;--line:#e1e7f0;--r:18px}
+*{box-sizing:border-box;margin:0}
+body{font:16px/1.45 "Trebuchet MS","Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:84px}
+html,body{overflow-x:hidden}body{overflow-wrap:anywhere}
+main{max-width:620px;margin:auto;padding:16px}
+h1{font-size:1.6rem}h2{font-size:1.2rem;margin-bottom:6px}p.s{color:var(--mut);font-size:.92rem}
+.card{overflow:hidden;background:var(--card);border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:0 1px 0 var(--line)}
+.hero{background:var(--ink);color:#fff}.hero .big{font-size:2.8rem;font-weight:800;color:var(--sun);line-height:1.1}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;border-radius:14px;padding:12px 16px;background:var(--main);color:#fff;font-weight:700;min-height:48px}
+button.alt{background:var(--soft);color:var(--ink)}button.ghost{background:none;color:var(--mut);min-height:36px;padding:6px 10px}
+input,select{width:100%;padding:12px;border:2px solid var(--line);border-radius:12px;background:#fff;margin:4px 0 10px;min-height:48px}
+:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px}
+.chip{max-width:100%;white-space:normal;text-align:left;background:#fff;border:2px solid var(--line);color:var(--ink);padding:8px 12px;min-height:44px;border-radius:999px;font-weight:600}
+.chip.on{border-color:var(--main);background:var(--soft)}
+.bar{height:16px;background:var(--line);border-radius:99px;overflow:hidden;margin:8px 0}
+.bar i{display:block;height:100%;background:var(--main);border-radius:99px;transition:width .9s ease}
+.bar.warn i{background:#e8a317}.bar.max i{background:#d9534f}
+.pos{color:var(--main);font-weight:700}.neg{color:#c0392b;font-weight:700}
+.item{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.ico{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:1.3rem;flex:none}
+.item .t{flex:1;min-width:0}.am{white-space:nowrap}input[type=date]{max-width:100%}.tag{font-size:.75rem;background:#fff1c9;border-radius:99px;padding:2px 8px}
+.bars{display:flex;gap:6px;align-items:flex-end;height:150px}.bars div{flex:1;min-width:0;text-align:center;font-size:.8rem}.bars small{display:block;height:16px;font-size:.72rem}
+.bars b{display:block;background:var(--main);border-radius:8px 8px 0 0;transition:height .8s}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:center;z-index:5}
+nav button{flex:1;max-width:124px;background:none;color:var(--mut);font-size:.78rem;border-radius:0;padding:8px 2px}
+nav button span{display:block;font-size:1.4rem}nav button.on{color:var(--main)}
+#toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:14px;max-width:90%;z-index:9;display:none}
+.pie{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.pie svg{width:150px;height:150px;flex:none;max-width:100%;transform:rotate(-90deg)}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head>
+<body>
+<main id="app"></main><div id="toast" role="status"></div><nav id="nav"></nav>
+<script>
+/* ===== 2. DATOS: categorías, consejos y plantillas (todo en español) ===== */
+const C=[{id:'comida',n:'Comida y recreo',i:'🥟',c:'#f59e0b'},{id:'transp',n:'Transporte',i:'🚌',c:'#3b82f6'},
+{id:'util',n:'Útiles y fotocopias',i:'✏️',c:'#8b5cf6'},{id:'salidas',n:'Salidas y diversión',i:'🎉',c:'#ec4899'},
+{id:'recargas',n:'Recargas y suscripciones',i:'📱',c:'#14b8a6'},{id:'ropa',n:'Ropa y cuidado personal',i:'👕',c:'#ef4444'},
+{id:'otros',n:'Otros',i:'🧩',c:'#64748b'},{id:'ahorro',n:'Ahorro',i:'🐷',c:'#22c55e'}];
+const cat=id=>C.find(c=>c.id==id);
+const TIPS=['Antes de comprar algo que no planeaste, espera 10 minutos. Muchas veces las ganas pasan.','Anotar cada gasto toma 5 segundos y te ayuda a saber a dónde se va tu dinero.','Guardar Bs 2 cada día suma Bs 14 en una semana. ¡Lo pequeño también cuenta!','Llevar de casa un snack o refresco puede ahorrarte varios bolivianos a la semana.','Ponerle nombre a tu ahorro (por ejemplo, "regalo para mamá") lo hace más fácil de lograr.'];
+const LEARN=[['Ahorrar sin dolor','Guarda una parte pequeña apenas recibas tu mesada, antes de gastar. Aunque sean Bs 5, ya es un comienzo.'],
+['Evitar compras impulsivas','Una compra impulsiva es la que no habías pensado. Respira, espera 10 minutos y pregúntate: ¿la necesito hoy?'],
+['Un presupuesto simple','Un presupuesto es decidir de antemano cuánto vas a gastar. Resta tu ahorro a tu mesada y reparte lo demás por días.'],
+['Gastos hormiga','Son gastos pequeños y repetidos, como un snack diario. Parecen poco, pero al mes pueden sumar bastante.'],
+['Una meta concreta','Una meta clara tiene nombre, monto y fecha. Ejemplo: "Salida con amigos, Bs 30, en 4 semanas".']];
+const PLANT=[['Salida con amigos',30],['Recarga',10],['Ropa',80],['Regalo',25]];
+
+/* ===== 3. FECHAS: la semana empieza el lunes y la mesada llega cada lunes ===== */
+const DAY=864e5,fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const addD=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
+const parse=s=>{const[a,b,c]=s.split('-');return new Date(+a,b-1,+c)};
+const today=addD(new Date(),0),ws=addD(today,-((today.getDay()+6)%7)),nextMon=addD(ws,7);
+const daysLeft=Math.round((nextMon-today)/DAY);
+const DIAS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+/* ===== 4. ESTADO: datos de ejemplo FICTICIOS (se guardan solo mientras la página está abierta) ===== */
+let nid=1;
+const S={v:'welcome',name:'',tx:[],budget:45,type:'g',editing:null,hf:'sem',hc:'all',
+ draft:{amt:'',cat:'comida',imp:false,note:''},goals:[
+ {name:'Salida con amigos',amt:30,saved:12,date:fmt(addD(today,21))},
+ {name:'Recarga del celular',amt:10,saved:10,date:fmt(addD(today,7))}]};
+// [día respecto al lunes, tipo, monto, categoría, nota, no planeada]
+[[-10,'g',6,'ahorro','Aporte a mi meta'],[-9,'g',4,'comida','Salteña'],[-8,'g',5,'util','Fotocopias del cuaderno'],[-7,'i',50,'otros','Mesada'],
+[-6,'g',6,'salidas','Helado con amigos',1],[-5,'g',2,'transp','Micro'],[-3,'g',6,'ahorro','Aporte a mi meta'],[-2,'g',3,'comida','Snack del recreo',1],
+[0,'i',50,'otros','Mesada'],[0,'g',4,'comida','Salteña'],[0,'g',2,'transp','Micro'],
+[1,'g',2,'transp','Micro'],[1,'g',5,'comida','Refresco y galletas',1],[2,'g',2,'transp','Micro'],[2,'g',3,'comida','Snack del recreo',1],
+[2,'g',3,'recargas','Recarga pequeña'],[3,'g',2,'transp','Micro'],[3,'g',4,'comida','Salteña'],[3,'g',6,'salidas','Helado con amigos',1],
+[4,'g',2,'transp','Micro'],[4,'g',3,'comida','Snack del recreo']].forEach(([d,t,a,c,n,imp])=>{
+ const dt=addD(ws,d); if(dt<=today)S.tx.push({id:nid++,type:t,amt:a,cat:c,date:fmt(dt),note:n,imp:!!imp})});
+
+/* ===== 5. CÁLCULOS ===== */
+const m=n=>'Bs '+(Math.round(n*100)/100).toString().replace('.',',');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const week=()=>S.tx.filter(t=>t.date>=fmt(ws)&&t.date<=fmt(today));
+const sum=(a,f=()=>1)=>a.filter(f).reduce((s,t)=>s+t.amt,0);
+const gastos=a=>sum(a,t=>t.type=='g'&&t.cat!='ahorro'); // gastos reales (sin contar lo que ahorras)
+const disponible=()=>sum(week(),t=>t.type=='i')-sum(week(),t=>t.type=='g');
+const pctPres=()=>Math.round(gastos(week())/S.budget*100);
+function msgPres(p){return p>=100?'Llegaste a tu presupuesto de la semana. Pausa y piensa qué es lo más importante hasta la próxima mesada.'
+ :p>=80?'Ya usaste gran parte de tu presupuesto. ¿Te alcanzará hasta la próxima mesada?'
+ :p>=50?'Llevas la mitad de tu presupuesto. ¡Vas bien, sigue con calma!':'Vas muy bien: todavía tienes buen margen esta semana.'}
+
+/* ===== 6. NAVEGACIÓN ===== */
+const NAV=[['home','🏠','Inicio'],['reg','➕','Registrar'],['graf','📊','Gráficos'],['metas','🎯','Metas'],['learn','💡','Aprende']];
+function go(v){if(S.editing&&v!='reg'){S.draft={amt:'',cat:'comida',imp:false,note:''};S.type='g'}S.v=v;if(v!='reg')S.editing=null;S.delAsk=null;R();scrollTo(0,0)}
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>e.style.display='none',4200)}
+const back=()=>`<button class="ghost" onclick="go('home')">← Volver al inicio</button>`;
+
+/* ===== 7. PANTALLAS ===== */
+const V={
+welcome:()=>`<div class="card hero" style="margin-top:8vh"><h1>SaveUp 🇧🇴</h1>
+<p style="margin:10px 0">Aquí anotas lo que ganas y lo que gastas, ves en qué se va tu dinero y ahorras para lo que quieres.</p>
+<p class="s" style="color:#cfd6ea">Solo te toma unos segundos por día. No pedimos datos personales.</p></div>
+<div class="card"><label>¿Cómo quieres que te llamemos? <input id="nm" placeholder="Tu apodo o nombre" maxlength="20"></label>
+<button style="width:100%" onclick="S.name=document.getElementById('nm').value.trim()||'amigo';go('home')">Entrar</button>
+<p class="s" style="margin-top:10px">Prototipo de investigación escolar. Todos los datos que ves son de ejemplo y ficticios.</p></div>`,
+
+home:()=>{const d=disponible(),p=pctPres(),g=S.goals[0],gp=g?Math.min(100,Math.round(g.saved/g.amt*100)):0,
+ por=daysLeft>0?Math.max(0,d)/daysLeft:0,w=week();
+ return`<h1>Hola, ${esc(S.name||'amigo')} 👋</h1><p class="s" style="margin-bottom:12px">Esto es lo que tienes hoy.</p>
+ <div class="card hero"><p>Dinero disponible</p><div class="big">${m(d)}</div>
+ <p style="margin-top:8px">Faltan <b>${daysLeft} ${daysLeft==1?'día':'días'}</b> para la próxima mesada (el lunes).</p>
+ <p>${d>0?`Puedes gastar hasta <b>${m(por)}</b> por día para que te alcance.`:'Esta semana va ajustada. Mira los consejos para cuidar lo que queda.'}</p></div>
+ <div class="grid"><div class="card"><p class="s">Ingresos de la semana</p><p class="pos">${m(sum(w,t=>t.type=='i'))}</p></div>
+ <div class="card"><p class="s">Gastos de la semana</p><p class="neg">${m(sum(w,t=>t.type=='g'))}</p></div></div>
+ <div class="card"><h2>Tu presupuesto semanal</h2><p class="s">Un presupuesto es lo que decides gastar como máximo.</p>
+ <div class="bar ${p>=100?'max':p>=80?'warn':''}"><i style="width:${Math.min(100,p)}%"></i></div><p>${p}% usado de ${m(S.budget)}. ${msgPres(p)}</p>
+ <div class="row" style="margin-top:8px"><button class="alt" onclick="go('pres')">Cambiar presupuesto</button><button class="alt" onclick="go('hist')">Ver historial</button></div></div>
+ <div class="card"><h2>Mi meta principal</h2>${g?`<p>${esc(g.name)}: ${m(g.saved)} de ${m(g.amt)}</p><div class="bar"><i style="width:${gp}%"></i></div>
+ <button class="ghost" onclick="go('metas')">Ver mis metas</button>`:`<p class="s">Aún no tienes metas.</p><button onclick="go('metas')">Crear mi primera meta</button>`}</div>
+ <div class="card" style="background:var(--soft)"><h2>💡 Consejo del día</h2><p>${TIPS[today.getDate()%TIPS.length]}</p></div>`},
+
+reg:()=>{const e=S.editing?S.tx.find(t=>t.id==S.editing):null,dr=S.draft;
+ return`<h1>${e?'Editar movimiento':'Registrar movimiento'}</h1><p class="s">Monto, categoría y guardar: solo tres toques.</p><div class="card" style="margin-top:12px">
+ <div class="chips"><button class="chip ${S.type=='g'?'on':''}" onclick="setT('g')">Gasto</button><button class="chip ${S.type=='i'?'on':''}" onclick="setT('i')">Ingreso</button></div>
+ <label>Monto en bolivianos<input id="amt" type="number" inputmode="decimal" min="0" step="0.5" placeholder="Ej.: 5" value="${dr.amt}" oninput="S.draft.amt=this.value"></label>
+ <div class="chips">${[2,5,10,20].map(a=>`<button class="chip" onclick="S.draft.amt=${a};R()">Bs ${a}</button>`).join('')}</div>
+ <p>Categoría</p><div class="chips">${C.map(c=>`<button class="chip ${dr.cat==c.id?'on':''}" onclick="S.draft.cat='${c.id}';R()">${c.i} ${c.n}</button>`).join('')}</div>
+ ${S.type=='g'?`<label style="display:flex;gap:10px;align-items:center;margin-bottom:10px"><input type="checkbox" style="width:24px;min-height:24px;margin:0" ${dr.imp?'checked':''} onchange="S.draft.imp=this.checked"> ¿Fue una compra que no tenías planeada?</label>`:''}
+ <label>Nota (opcional)<input id="nt" maxlength="40" placeholder="Ej.: salteña en el recreo" value="${esc(dr.note)}" oninput="S.draft.note=this.value"></label>
+ <p class="s">Fecha: ${e?e.date:fmt(today)} (se pone sola)</p><button style="width:100%;margin-top:8px" onclick="save()">Guardar</button>${e?`<button class="alt" style="width:100%;margin-top:8px" onclick="go('hist')">Cancelar</button>`:''}</div>`},
+
+pres:()=>`${back()}<h1>Presupuesto semanal</h1><p class="s">Elige cuánto quieres gastar esta semana. Te avisaremos con cariño al llegar al 50 %, 80 % y 100 %.</p>
+ <div class="card" style="margin-top:12px"><label>Mi presupuesto (Bs)<input id="pb" type="number" min="1" value="${S.budget}"></label>
+ <button onclick="S.budget=Math.max(1,+document.getElementById('pb').value||S.budget);toast('Presupuesto guardado: '+m(S.budget));R()">Guardar presupuesto</button></div>
+ <div class="card"><div class="bar ${pctPres()>=100?'max':pctPres()>=80?'warn':''}"><i style="width:${Math.min(100,pctPres())}%"></i></div>
+ <p>Llevas ${m(gastos(week()))} (${pctPres()}%). ${msgPres(pctPres())}</p></div>`,
+
+hist:()=>{let a=[...S.tx].sort((x,y)=>y.date.localeCompare(x.date)||y.id-x.id);
+ if(S.hf=='sem')a=a.filter(t=>t.date>=fmt(ws));if(S.hf=='mes')a=a.filter(t=>t.date.slice(0,7)==fmt(today).slice(0,7));
+ if(S.hc!='all')a=a.filter(t=>t.cat==S.hc);
+ return`${back()}<h1>Historial</h1><div class="grid" style="margin-top:10px"><select onchange="S.hf=this.value;R()" aria-label="Periodo">
+ ${[['sem','Esta semana'],['mes','Este mes'],['todo','Todo']].map(o=>`<option value="${o[0]}" ${S.hf==o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>
+ <select onchange="S.hc=this.value;R()" aria-label="Categoría"><option value="all">Todas las categorías</option>${C.map(c=>`<option value="${c.id}" ${S.hc==c.id?'selected':''}>${c.n}</option>`).join('')}</select></div>
+ <div class="card">${a.length?a.map(t=>{const c=cat(t.cat);return`<div class="item"><div class="ico" style="background:${c.c}22">${c.i}</div>
+ <div class="t"><b>${esc(t.note||c.n)}</b> ${t.imp?'<span class="tag">no planeada</span>':''}<br><span class="s">${t.date} · ${c.n}</span></div>
+ <b class="am ${t.type=='i'?'pos':'neg'}">${t.type=='i'?'+':'−'}${m(t.amt)}</b>
+ <div><button class="ghost" aria-label="Editar" onclick="edit(${t.id})">✏️</button><button class="ghost" aria-label="Eliminar" onclick="del(${t.id})">${S.delAsk==t.id?'¿Borrar?':'🗑️'}</button></div></div>`}).join(''):'<p class="s">No hay movimientos con estos filtros. ¡Anota tu primer gasto!</p>'}</div>`},
+
+graf:()=>{const w=week().filter(t=>t.type=='g'&&t.cat!='ahorro'),tot=gastos(w)||1;
+ const by=C.map(c=>({...c,v:sum(w,t=>t.cat==c.id)})).filter(c=>c.v>0).sort((a,b)=>b.v-a.v);let off=0;
+ const days=DIAS.map((_,i)=>sum(w,t=>t.date==fmt(addD(ws,i)))),mx=Math.max(...days,1),imp=week().filter(t=>t.imp).length;
+ const hor=w.filter(t=>t.amt<=6),hs=sum(hor);
+ const dmax=days.indexOf(Math.max(...days));
+ return`<h1>Gráficos</h1><p class="s">Así se fue tu dinero esta semana.</p>
+ <div class="card" style="margin-top:12px"><h2>¿En qué se fue tu dinero?</h2>${by.length?`<div class="pie"><svg viewBox="0 0 36 36">${by.map(c=>{const p=c.v/tot*100,s=`<circle r="14" cx="18" cy="18" pathLength="100" fill="none" stroke="${c.c}" stroke-width="7" stroke-dasharray="${p} ${100-p}" stroke-dashoffset="${-off}"/>`;off+=p;return s}).join('')}</svg>
+ <div>${by.map(c=>`<p><span class="dot" style="background:${c.c}"></span>${c.i} ${c.n}: ${m(c.v)}</p>`).join('')}</div></div>
+ <p style="margin-top:8px"><b>Esta semana gastaste más en ${by[0].n.toLowerCase()}.</b></p>`:'<p class="s">Aún no hay gastos esta semana.</p>'}</div>
+ <div class="card"><h2>Gasto por día (en Bs)</h2><div class="bars">${days.map((v,i)=>`<div><small>${v?Math.round(v):''}</small><b style="height:${v/mx*90}px"></b>${DIAS[i]}</div>`).join('')}</div>
+ <p style="margin-top:8px">${Math.max(...days)?`El día en que más gastaste fue el ${['lunes','martes','miércoles','jueves','viernes','sábado','domingo'][dmax]}.`:'Todavía no hay datos de la semana.'}</p></div>
+ <div class="card" style="background:#fff7dd"><h2>Compras no planeadas: ${imp}</h2><p>${imp==0?'¡Esta semana no tuviste compras no planeadas, muy bien!':imp<3?'Tuviste '+imp+' esta semana. Es normal; si esperas 10 minutos antes de comprar, puedes reducirlas.':'Tuviste '+imp+' esta semana. Prueba esperar 10 minutos antes de comprar.'}</p></div>
+ <div class="card"><h2>🐜 Gastos hormiga</h2><p class="s">Son gastos pequeños (hasta Bs 6) que se repiten y casi no se notan.</p>
+ <p style="margin-top:8px">Esta semana: <b>${hor.length} compras</b> por ${m(hs)}.</p><p>Al mes sumarían alrededor de <b>${m(hs*4)}</b>. ¡Con eso podrías lograr una meta!</p></div>
+ <div class="card"><h2>Categorías</h2><div class="chips">${C.map(c=>`<span class="chip" style="border-color:${c.c}">${c.i} ${c.n}</span>`).join('')}</div></div>`},
+
+metas:()=>`<h1>Metas de ahorro</h1><p class="s">Una meta de ahorro es algo que quieres comprar o hacer, y vas juntando dinero poco a poco.</p>
+ ${S.goals.map((g,i)=>{const p=Math.min(100,Math.round(g.saved/g.amt*100)),wl=Math.max(1,Math.ceil((parse(g.date)-today)/DAY/7)),falta=Math.max(0,g.amt-g.saved);
+ return`<div class="card" style="margin-top:12px"><div class="row"><h2>${esc(g.name)}</h2><button class="ghost" aria-label="Quitar meta" onclick="S.goals.splice(${i},1);R()">🗑️</button></div>
+ <div class="bar"><i style="width:${p}%"></i></div><p>${m(g.saved)} de ${m(g.amt)} (${p}%)</p>
+ <p class="s">${falta?`Faltan ${wl} ${wl==1?'semana':'semanas'}: aporta unos ${m(Math.ceil(falta/wl))} por semana.`:''} ${parse(g.date)<today&&falta?'Sin culpa: lo importante es seguir. Puedes crear la meta con otra fecha.':''}</p>
+ <p>${p>=100?'¡Lo lograste! Qué orgullo, felicitaciones 🎉':p>=50?'Vas muy bien, ya reuniste la mitad de tu meta.':'Cada aporte pequeño cuenta. ¡Tú puedes!'}</p>
+ ${falta?`<div class="chips">${[2,5,10].map(a=>`<button class="chip" onclick="aporte(${i},${a})">+ Bs ${a}</button>`).join('')}</div>`:''}</div>`}).join('')}
+ <div class="card"><h2>Crear una meta nueva</h2><div class="chips">${PLANT.map(p=>`<button class="chip" onclick="plant('${p[0]}',${p[1]})">${p[0]} · Bs ${p[1]}</button>`).join('')}</div>
+ <label>Nombre<input id="gn" maxlength="30" placeholder="Ej.: regalo de cumpleaños"></label><label>Monto (Bs)<input id="ga" type="number" min="1"></label>
+ <label>Fecha límite<input id="gd" type="date" value="${fmt(addD(today,28))}"></label><button style="width:100%" onclick="crearMeta()">Crear meta</button></div>`,
+
+learn:()=>`<h1>Aprende</h1><p class="s">Tarjetas cortas para cuidar mejor tu dinero.</p>${LEARN.map(l=>`<div class="card" style="margin-top:12px"><h2>${l[0]}</h2><p>${l[1]}</p></div>`).join('')}`
+};
+
+/* ===== 8. ACCIONES ===== */
+function setT(t){S.type=t;S.draft.cat=t=='i'?'otros':'comida';S.draft.imp=false;R()}
+function save(){
+ const a=parseFloat(document.getElementById('amt').value);
+ if(!(a>0)){toast('Escribe cuánto fue, por ejemplo 5.');return}
+ const antes=pctPres(),dr=S.draft;
+ if(S.editing){Object.assign(S.tx.find(t=>t.id==S.editing),{type:S.type,amt:a,cat:dr.cat,note:dr.note,imp:S.type=='g'&&dr.imp});S.editing=null;toast('Movimiento actualizado ✔')}
+ else{S.tx.push({id:nid++,type:S.type,amt:a,cat:dr.cat,date:fmt(today),note:dr.note,imp:S.type=='g'&&dr.imp});toast('¡Listo! Tu movimiento quedó guardado ✔')}
+ S.draft={amt:'',cat:'comida',imp:false,note:''};S.type='g';
+ const ahora=pctPres();for(const u of [100,80,50])if(antes<u&&ahora>=u){setTimeout(()=>toast(msgPres(u)),1500);break}
+ go('home')}
+function edit(id){const t=S.tx.find(x=>x.id==id);S.editing=id;S.type=t.type;S.draft={amt:t.amt,cat:t.cat,imp:t.imp,note:t.note};S.v='reg';R();scrollTo(0,0)}
+function del(id){if(S.delAsk==id){S.tx=S.tx.filter(t=>t.id!=id);S.delAsk=null;toast('Movimiento eliminado');}else{S.delAsk=id;toast('Toca de nuevo el botón para borrar.')}R()}
+function aporte(i,a){const g=S.goals[i];g.saved=Math.min(g.amt,g.saved+a);
+ S.tx.push({id:nid++,type:'g',amt:a,cat:'ahorro',date:fmt(today),note:'Aporte a: '+g.name,imp:false});toast('¡Gracias a ti, tu meta avanza! 🌱');R()}
+function plant(n,a){document.getElementById('gn').value=n;document.getElementById('ga').value=a}
+function crearMeta(){const n=document.getElementById('gn').value.trim(),a=+document.getElementById('ga').value,d=document.getElementById('gd').value;
+ if(!n||!(a>0)||!d){toast('Completa nombre, monto y fecha, o elige una plantilla.');return}
+ S.goals.push({name:n,amt:a,saved:0,date:d});toast('¡Meta creada! Empieza con un aporte pequeño.');R()}
+
+/* ===== 9. DIBUJAR LA PANTALLA (se vuelve a llamar cada vez que cambian los datos) ===== */
+function R(){
+ document.getElementById('app').innerHTML=V[S.v]();
+ const nav=document.getElementById('nav');nav.style.display=S.v=='welcome'?'none':'flex';
+ nav.innerHTML=NAV.map(n=>`<button class="${S.v==n[0]||(n[0]=='home'&&['pres','hist'].includes(S.v))?'on':''}" onclick="go('${n[0]}')"><span>${n[1]}</span>${n[2]}</button>`).join('');
+ if(S.v=='reg'||S.v=='home'||S.v=='metas'){/* anima las barras al aparecer */
+  document.querySelectorAll('.bar i').forEach(b=>{const w=b.style.width;b.style.width='0';requestAnimationFrame(()=>requestAnimationFrame(()=>b.style.width=w))})}}
+R();
+</script></body></html>
